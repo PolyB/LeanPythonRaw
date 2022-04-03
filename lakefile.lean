@@ -24,4 +24,5 @@ package leanpythonraw (pkgDir) (args) {
   libRoots := #[`Python.Raw]
   moreLibTargets := #[cLibTarget pkgDir]
   moreLinkArgs := #[s!"-l{python}"]
+  defaultFacet := PackageFacet.staticLib
 }

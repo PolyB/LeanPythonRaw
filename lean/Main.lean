@@ -1,5 +1,7 @@
 import Python.Raw.Ffi
 
+open Python.Raw
+
 def str := PyUnicode_FromString
 
 def throwIfBad : Except PyObject a → IO a

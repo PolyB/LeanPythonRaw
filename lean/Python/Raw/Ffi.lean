@@ -1,3 +1,5 @@
+namespace Python.Raw
+
 private constant PyObjectNonempty : NonemptyType
 def PyObject : Type := PyObjectNonempty.type
 
