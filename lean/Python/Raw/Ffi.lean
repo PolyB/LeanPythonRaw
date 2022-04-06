@@ -1,4 +1,4 @@
-namespace Python.Raw
+namespace Python.Raw.Ffi
 
 private constant PyObjectNonempty : NonemptyType
 def PyObject : Type := PyObjectNonempty.type
@@ -21,7 +21,7 @@ constant PyUnicode_FromString : String → IO PyObject
 constant PyObject_GetAttrString : PyObject → String → IOExp PyObject
 
 @[extern "Lean_PyUnicode_AsUTF8"]
-constant PyUnicode_AsUTF8 : PyObject → IO (Option String)
+constant PyUnicode_AsUTF8 : PyObject → IOExp String
 
 @[extern "Lean_PyImport_Import"]
 constant PyImport_Import : PyObject → IOExp PyObject

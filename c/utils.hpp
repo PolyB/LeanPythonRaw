@@ -40,7 +40,7 @@ inline lean_obj_res WrapIOExcept(F&& f) {
 
         // Make a IO (Except.ok x)
         lean_object *tuple = lean_alloc_ctor(1, 1, 0);
-        lean_ctor_set(tuple, 0, result.value());
+        lean_ctor_set(tuple, 0, *result);
         return lean_io_result_mk_ok(tuple);
     }
 

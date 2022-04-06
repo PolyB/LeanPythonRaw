@@ -1,34 +1,26 @@
-import Python.Raw.Ffi
+import Python.Raw
 
 open Python.Raw
 
-def str := PyUnicode_FromString
+abbrev PyMonad := ExceptT Ffi.PyObject IO
 
-def throwIfBad : Except PyObject a → IO a
-| Except.error err => do
-                        PyObject_Print err
-                        println! "" -- python doesn't print newline
-                        throw $ IO.userError "python error"
-| Except.ok res => pure res
+def PyMonad_run (m : PyMonad a) : IO a := do
+  let a : Except Ffi.PyObject a ← m.run
+  match a with
+  | (Except.error err) => throw $ IO.userError "TODO"
+  | (Except.ok ok) => return ok
 
 -- import rich ; rich.print(arg)
-def rich_prettyPrint (obj : PyObject) : IO Unit := do
-  let rich_str ← PyUnicode_FromString "rich"
-  let rich_import ← throwIfBad $ ← PyImport_Import rich_str
-  let rich_print ← throwIfBad $ ← PyObject_GetAttrString rich_import "print"
-  let emptyDict ← throwIfBad $ ← PyDict_New
-  let emptyDictTuple ← throwIfBad $ ←PyTuple_Make #[obj]
-  _ ← throwIfBad $ ← (PyObject_Call rich_print emptyDictTuple emptyDict)
+def rich_prettyPrint [Monad pym] [MonadExcept Ffi.PyObject pym] [MonadLiftT IO pym] (obj : Ffi.PyObject) : pym Unit := do
+  let rich_str ← Python.Raw.MkString "rich"
+  let rich_import ← Import rich_str
+  let rich_print ← GetObjAttr rich_import "print"
+  _ ← CallOneArg rich_print obj
 
 
 def main : IO PUnit := do
-
-  Py_Initialize
-  println! "Initialized : {←Py_IsInitialized}"
-
-  let emptyDict ← throwIfBad $ ← PyDict_New
-  let dict ← throwIfBad $ ← PyDict_SetItemString emptyDict "Test" emptyDict
-  let s ←PyUnicode_FromString "Hello !"
-  let array ← throwIfBad $ ←PyTuple_Make #[emptyDict, s]
-
-  rich_prettyPrint array
+  Initialize
+  println! "Initialized : {←IsInitialized}"
+  PyMonad_run $ do
+    let test_str ← Python.Raw.MkString "TEST"
+    rich_prettyPrint test_str
