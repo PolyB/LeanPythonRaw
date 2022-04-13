@@ -26,6 +26,18 @@ inline lean_obj_res make_pyobject(PyObject *obj) {
     return (lean_obj_res)lean_alloc_external(get_pyobject_class(), obj);
 }
 
+static inline lean_obj_res lean_mk_option_some(lean_obj_arg obj)
+{
+    lean_object *tuple = lean_alloc_ctor(1, 1, 0);
+    lean_ctor_set(tuple, 0, obj);
+    return tuple;
+}
+
+static inline lean_obj_res lean_mk_option_none()
+{
+    return lean_box(0);
+}
+
 // IO Except wrapper
 
 template <class F>
@@ -43,21 +55,42 @@ inline lean_obj_res WrapIOExcept(F&& f) {
         lean_ctor_set(tuple, 0, *result);
         return lean_io_result_mk_ok(tuple);
     }
+    PyObject *exType = NULL;
+    PyObject *exValue = NULL;
+    PyObject *exTraceBack = NULL;
 
-    PyObject *error = PyErr_Occurred();
-    if (!error)
+    PyErr_Fetch(&exType, &exValue, &exTraceBack);
+    if (!exType)
     {
         // maybe it cost a little more, but it's convenient and shouldn't happen a lot
         PyErr_SetString(PyExc_Exception, "Lean ffi : got empty exception");
-        error = PyErr_Occurred();
+        PyErr_Fetch(&exType, &exValue, &exTraceBack);
+        assert(exType);
     }
     PyGILState_Release(state);
 
-    lean_obj_res error_lean = make_pyobject(error);
+    lean_obj_res exTypeL, exValueL, exTraceBackL;
 
-    // Make a IO (Except.err x)
+    exTypeL = make_pyobject(exType);
+
+    if (exValue)
+        exValueL = lean_mk_option_some(make_pyobject(exValue));
+    else
+        exValueL = lean_mk_option_none();
+
+    if (exTraceBack)
+        exTraceBackL = lean_mk_option_some(make_pyobject(exTraceBack));
+    else
+        exTraceBackL = lean_mk_option_none();
+
+    lean_object *pyError = lean_alloc_ctor(0, 3, 0);
+    lean_ctor_set(pyError, 0, exTypeL);
+    lean_ctor_set(pyError, 1, exValueL);
+    lean_ctor_set(pyError, 2, exTraceBackL);
+
+    // Make a IO (Except.err PyError)
 
     lean_object *tuple = lean_alloc_ctor(0, 1, 0);
-    lean_ctor_set(tuple, 0, error_lean);
+    lean_ctor_set(tuple, 0, pyError);
     return lean_io_result_mk_ok(tuple);
 }
