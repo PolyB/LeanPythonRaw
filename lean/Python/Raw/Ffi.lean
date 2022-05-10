@@ -1,8 +1,9 @@
 namespace Python.Raw.Ffi
 
+-- This file contains raw bindings to C functions
+
 private constant PyObjectNonempty : NonemptyType
 def PyObject : Type := PyObjectNonempty.type
-
 
 structure PyError where
  exType : PyObject
@@ -62,6 +63,9 @@ constant PyObject_CallNoArgs : (callable : PyObject) → IOExp PyObject
 @[extern "Lean_PyObject_CallOneArg"]
 constant PyObject_CallOneArg : (callable : PyObject) → (arg : PyObject) → IOExp PyObject
 
+@[extern "Lean_PyObject_CallMethodOneArg"]
+constant PyObject_CallMethodOneArg : (obj : PyObject) → (name : PyObject) → (arg : PyObject) → IOExp PyObject
+
 @[extern "Lean_PyObject_Print"]
 constant PyObject_Print : PyObject → IO PUnit
 
@@ -71,6 +75,23 @@ constant PyObject_Str : PyObject → IOExp PyObject
 @[extern "Lean_PyObject_Repr"]
 constant PyObject_Repr : PyObject → IOExp PyObject
 
+@[extern "Lean_PyLong_FromLeanInt"]
+constant PyLong_FromLeanInt : Int → IOExp PyObject
+
+@[extern "Lean_PyLong_ToLeanInt"]
+constant PyLong_ToLeanInt : PyObject → IOExp Int
+
+-- please make it start with `Lean` so that it can be pretty_printed by python
+private def PyCapsule_Key : Type := String
+
+constant PyCapsule_Get_Value : PyCapsule_Key → Type
+
+@[extern "Lean_PyCapsule_Make"]
+constant PyCapsule_Make : (k : PyCapsule_Key) → PyCapsule_Get_Value k → IOExp PyObject
+
+@[extern "Lean_PyCapsule_Get"]
+constant PyCapsule_Get : (k : PyCapsule_Key) → PyObject → IOExp (PyCapsule_Get_Value k)
+
 -- Py_None is done manually as it is used to define `Inhabited PyObject`
 
 @[extern "Lean_PyObject_Py_None"]
@@ -79,6 +100,19 @@ def Py_None : PyObject := mkPyNone ()
 
 instance : Inhabited PyObject where
   default := Py_None
+
+macro "mkpycheck!" name:ident : command => do
+  return Lean.mkNullNode #[
+    ← `(constant $name : PyObject → Bool),
+    ← `(attribute [extern $(Lean.quote s!"Lean_{name}")] $name)
+  ]
+
+mkpycheck! PyBool_Check
+mkpycheck! PyUnicode_Check
+mkpycheck! PyList_Check
+mkpycheck! PyTuple_Check
+mkpycheck! PyDict_Check
+
 
 macro "mkpyobj!" name:ident : command =>do
                                           let extern_ident := Lean.mkIdentFrom name (Lean.Name.mkSimple s!"{name.getId.toString}_")

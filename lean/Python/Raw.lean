@@ -30,6 +30,9 @@ def MakeBool : Bool → PyObject
 | true => Py_True
 | false => Py_False
 
+def MakeInt (v : Int) : pym PyObject := RunRawFfi $ PyLong_FromLeanInt v
+def FromInt (obj : PyObject) : pym Int := RunRawFfi $ PyLong_ToLeanInt obj
+
 def MakeTuple (objs : Array PyObject) : pym PyObject := RunRawFfi $ PyTuple_Make objs
 
 def MakeList (objs : Array PyObject) : pym PyObject := RunRawFfi $ PyList_Make objs
@@ -42,5 +45,6 @@ def Call (callable : PyObject) (args_tuple : PyObject) (kwargs_dict : PyObject) 
 def CallNoKw (callable : PyObject) (args_tuple : PyObject) : pym PyObject := RunRawFfi $ PyObject_Call_NoKw callable args_tuple
 def CallNoArgs (callable : PyObject) : pym PyObject := RunRawFfi $ PyObject_CallNoArgs callable
 def CallOneArg (callable : PyObject) (arg : PyObject) : pym PyObject := RunRawFfi $ PyObject_CallOneArg callable arg
+def CallMethodOneArg (obj : PyObject) (name : PyObject) (arg : PyObject) : pym PyObject := RunRawFfi $ PyObject_CallMethodOneArg obj name arg
 
 def DebugPrint : PyObject → IO Unit := PyObject_Print

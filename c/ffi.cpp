@@ -96,7 +96,6 @@ extern "C" lean_obj_res Lean_MakeList(lean_obj_arg obj) {
     size_t obj_count = lean_array_size(obj);
     lean_object **objs_cptr = lean_array_cptr(obj);
 
-    // TODO : error handling
     return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
         PyObject *res = PyList_New(obj_count);
         if (res == nullptr)
@@ -196,6 +195,19 @@ extern "C" lean_obj_res Lean_PyObject_CallOneArg(lean_obj_arg callable, lean_obj
     });
 }
 
+extern "C" lean_obj_res Lean_PyObject_CallMethodOneArg(lean_obj_arg obj, lean_obj_arg name, lean_obj_arg arg) {
+    PyObject *py_obj = get_pyobject(obj);
+    PyObject *py_name = get_pyobject(name);
+    PyObject *py_arg = get_pyobject(arg);
+
+    return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+        PyObject *res = PyObject_CallMethodOneArg(py_obj, py_name, py_arg);
+        if (res == nullptr)
+            return {};
+        return make_pyobject(res);
+    });
+}
+
 extern "C" lean_obj_res Lean_PyObject_Print(lean_obj_arg arg) {
     PyObject *py_obj = (PyObject *)lean_get_external_data(arg);
     FILE* out = stdout;
@@ -232,6 +244,98 @@ extern "C" lean_obj_res Lean_PyObject_Str(lean_obj_arg arg) {
         return make_pyobject(res);
     });
 }
+
+extern "C" lean_obj_res Lean_PyLong_FromLeanInt(lean_obj_arg arg) {
+    if (lean_is_scalar(arg)) {
+        int64_t v = lean_scalar_to_int64(arg);
+        return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+
+            static_assert(sizeof(long long) >= sizeof(int64_t), "we don't want data loss during cast");
+
+            PyObject *res = PyLong_FromLongLong((long long)v);
+            if (res == NULL)
+                return {};
+            return make_pyobject(res);
+        });
+    }
+    else
+    {
+        return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+            PyErr_SetString(PyExc_OverflowError, "Python Ffi don't handle big ints");
+            return {};
+        });
+        // for big ints
+        // lean seems to use mpz, but there is no api for this :(
+        // python has an unofficial _PyLong_From_*
+        // todo : maybe use strings ?
+    }
+}
+
+extern "C" lean_obj_res Lean_PyLong_ToLeanInt(lean_obj_arg arg) {
+    PyObject *py_arg = get_pyobject(arg);
+
+    return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+
+        // TODO : use PyLong_AsLongLongAndOverflow to handle arbitrary long values
+        long long val = PyLong_AsLongLong(py_arg);
+        if (val == -1 && PyErr_Occurred())
+            return {};
+
+        static_assert(sizeof(long long) <= sizeof(int64_t), "we don't want data loss during cast");
+        return lean_int64_to_int(val);
+    });
+}
+
+extern "C" void Lean_PyCapsule_Destructor(PyObject *obj) {
+    // TODO
+}
+
+extern "C" lean_obj_res Lean_PyCapsule_Make(lean_obj_arg key, lean_obj_arg arg) {
+
+    return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+
+        const char *key_cstr = lean_string_cstr(key);
+
+        PyObject *py_capsule = PyCapsule_New(
+            arg,
+            key_cstr,
+            Lean_PyCapsule_Destructor
+        );
+
+        if (py_capsule == NULL)
+            return {};
+        
+        return make_pyobject(py_capsule);
+    });
+}
+
+extern "C" lean_obj_res Lean_PyCapsule_Get(lean_obj_arg key, lean_obj_arg arg) {
+    return WrapIOExcept([=]() -> std::optional<lean_obj_res> {
+        const char *key_cstr = lean_string_cstr(key);
+        PyObject *py_capsule = get_pyobject(arg);
+        lean_object *capsule = (lean_object *)PyCapsule_GetPointer(py_capsule, key_cstr);
+        if (capsule == NULL)
+            return {};
+        return capsule;
+    });
+}
+
+// generates extern calls of `int Method(PyObject *obj)`
+#define MakeCheckMethod(Name)                                     \
+    extern "C" lean_obj_res Lean_##Name(lean_obj_arg arg) {       \
+        PyObject *argP = get_pyobject(arg);                       \
+        if(Name(argP))                                            \
+            return lean_box(1);                                   \
+        else                                                      \
+            return lean_box(0);                                   \
+    }
+
+MakeCheckMethod(PyBool_Check)
+MakeCheckMethod(PyUnicode_Check)
+MakeCheckMethod(PyNumber_Check)
+MakeCheckMethod(PyList_Check)
+MakeCheckMethod(PyTuple_Check)
+MakeCheckMethod(PyDict_Check)
 
 #define MakePyObjectRefSymbol(Name)                                     \
     extern "C" lean_obj_res Lean_PyObject_##Name(lean_obj_arg arg) {    \
