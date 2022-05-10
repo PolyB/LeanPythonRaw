@@ -401,3 +401,39 @@ MakePyObjectRefSymbol(PyExc_NotADirectoryError)
 MakePyObjectRefSymbol(PyExc_PermissionError)
 MakePyObjectRefSymbol(PyExc_ProcessLookupError)
 MakePyObjectRefSymbol(PyExc_TimeoutError)
+/*  
+static PyTypeObject lean_PyFunWrapperTypeObject = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "lean.PyFunWrapper",
+    .tp_doc = PyDoc_STR("A wrapper around a callable Lean object"),
+    .tp_basicsize = sizeof(Lean_PyFunWrapperType),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    //.tp_new = PyType_GenericNew
+};
+
+static PyModuleDef leanModule = {
+    PyModuleDef_HEAD_INIT,
+    .m_name = "lean",
+    .m_doc = "Lean module for defining types",
+    .m_size = -1
+};
+
+PyMODINIT_FUNC
+PyInit_lean(void)
+{
+    PyObject *m;
+    if (PyType_Ready(&lean_PyFunWrapperTypeObject) < 0)
+        return NULL;
+    m = PyModule_Create(&leanModule);
+    if (m == NULL)
+        return NULL;
+    Py_INCREF(&lean_PyFunWrapperTypeObject);
+    if (PyModule_AddObject(m, "Lean", (PyObject *)&lean_PyFunWrapperTypeObject) < 0) {
+        Py_DECREF(&lean_PyFunWrapperTypeObject);
+        Py_DECREF(m);
+        return NULL;
+    }
+    return m;
+}
+*/

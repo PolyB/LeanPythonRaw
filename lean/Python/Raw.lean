@@ -48,3 +48,6 @@ def CallOneArg (callable : PyObject) (arg : PyObject) : pym PyObject := RunRawFf
 def CallMethodOneArg (obj : PyObject) (name : PyObject) (arg : PyObject) : pym PyObject := RunRawFfi $ PyObject_CallMethodOneArg obj name arg
 
 def DebugPrint : PyObject → IO Unit := PyObject_Print
+
+def PyCapsule_Make : (k : PyCapsule_Key) → PyCapsule_Get_Value k → pym PyObject := sorry
+def PyCapsule_Get : (k : PyCapsule_Key) → PyObject → pym (PyCapsule_Get_Value k) := sorry

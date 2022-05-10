@@ -2,7 +2,7 @@ namespace Python.Raw.Ffi
 
 -- This file contains raw bindings to C functions
 
-private constant PyObjectNonempty : NonemptyType
+private opaque PyObjectNonempty : NonemptyType
 def PyObject : Type := PyObjectNonempty.type
 
 structure PyError where
@@ -13,98 +13,100 @@ structure PyError where
 abbrev IOExp (t : Type) := IO $ Except PyError t
 
 @[extern "Lean_Py_Initialize"]
-constant Py_Initialize : IO Unit
+opaque Py_Initialize : IO Unit
 
 @[extern "Lean_Py_IsInitialized"]
-constant Py_IsInitialized : IO Bool
+opaque Py_IsInitialized : IO Bool
 
 @[extern "Lean_Py_FinalizeEx"]
-constant Py_FinalizeEx : IO Bool
+opaque Py_FinalizeEx : IO Bool
 
 @[extern "Lean_PyUnicode_FromString"]
-constant PyUnicode_FromString : String → IO PyObject
+opaque PyUnicode_FromString : String → IO PyObject
 
 @[extern "Lean_PyObject_GetAttrString"]
-constant PyObject_GetAttrString : PyObject → String → IOExp PyObject
+opaque PyObject_GetAttrString : PyObject → String → IOExp PyObject
 
 @[extern "Lean_PyObject_GetAttr"]
-constant PyObject_GetAttr : PyObject → PyObject → IOExp PyObject
+opaque PyObject_GetAttr : PyObject → PyObject → IOExp PyObject
 
 @[extern "Lean_PyUnicode_AsUTF8"]
-constant PyUnicode_AsUTF8 : PyObject → IOExp String
+opaque PyUnicode_AsUTF8 : PyObject → IOExp String
 
 @[extern "Lean_PyImport_Import"]
-constant PyImport_Import : PyObject → IOExp PyObject
+opaque PyImport_Import : PyObject → IOExp PyObject
 
 @[extern "Lean_MakeTuple"]
-constant PyTuple_Make : Array PyObject → IOExp PyObject
+opaque PyTuple_Make : Array PyObject → IOExp PyObject
 
 @[extern "Lean_MakeList"]
-constant PyList_Make : Array PyObject → IOExp PyObject
+opaque PyList_Make : Array PyObject → IOExp PyObject
 
 @[extern "Lean_PyDict_New"]
-constant PyDict_New : IOExp PyObject
+opaque PyDict_New : IOExp PyObject
 
 @[extern "Lean_PyDict_SetItemString"]
-constant PyDict_SetItemString : (dict : PyObject) → (key : String) → (value : PyObject) → IOExp PUnit
+opaque PyDict_SetItemString : (dict : PyObject) → (key : String) → (value : PyObject) → IOExp PUnit
 
 @[extern "Lean_PyDict_SetItem"]
-constant PyDict_SetItem: (dict : PyObject) → (key : PyObject) → (value : PyObject) → IOExp PUnit
+opaque PyDict_SetItem: (dict : PyObject) → (key : PyObject) → (value : PyObject) → IOExp PUnit
 
 @[extern "Lean_PyObject_Call"]
-constant PyObject_Call : (callable : PyObject) → (args_tuple : PyObject) → (kwargs_dict : PyObject) → IOExp PyObject
+opaque PyObject_Call : (callable : PyObject) → (args_tuple : PyObject) → (kwargs_dict : PyObject) → IOExp PyObject
 
 @[extern "Lean_PyObject_Call_NoKw"]
-constant PyObject_Call_NoKw : (callable : PyObject) → (args_tuple : PyObject) → IOExp PyObject
+opaque PyObject_Call_NoKw : (callable : PyObject) → (args_tuple : PyObject) → IOExp PyObject
 
 @[extern "Lean_PyObject_CallNoArgs"]
-constant PyObject_CallNoArgs : (callable : PyObject) → IOExp PyObject
+opaque PyObject_CallNoArgs : (callable : PyObject) → IOExp PyObject
 
 @[extern "Lean_PyObject_CallOneArg"]
-constant PyObject_CallOneArg : (callable : PyObject) → (arg : PyObject) → IOExp PyObject
+opaque PyObject_CallOneArg : (callable : PyObject) → (arg : PyObject) → IOExp PyObject
 
 @[extern "Lean_PyObject_CallMethodOneArg"]
-constant PyObject_CallMethodOneArg : (obj : PyObject) → (name : PyObject) → (arg : PyObject) → IOExp PyObject
+opaque PyObject_CallMethodOneArg : (obj : PyObject) → (name : PyObject) → (arg : PyObject) → IOExp PyObject
 
 @[extern "Lean_PyObject_Print"]
-constant PyObject_Print : PyObject → IO PUnit
+opaque PyObject_Print : PyObject → IO PUnit
 
 @[extern "Lean_PyObject_Str"]
-constant PyObject_Str : PyObject → IOExp PyObject
+opaque PyObject_Str : PyObject → IOExp PyObject
 
 @[extern "Lean_PyObject_Repr"]
-constant PyObject_Repr : PyObject → IOExp PyObject
+opaque PyObject_Repr : PyObject → IOExp PyObject
 
 @[extern "Lean_PyLong_FromLeanInt"]
-constant PyLong_FromLeanInt : Int → IOExp PyObject
+opaque PyLong_FromLeanInt : Int → IOExp PyObject
 
 @[extern "Lean_PyLong_ToLeanInt"]
-constant PyLong_ToLeanInt : PyObject → IOExp Int
+opaque PyLong_ToLeanInt : PyObject → IOExp Int
 
 -- please make it start with `Lean` so that it can be pretty_printed by python
-private def PyCapsule_Key : Type := String
+def PyCapsule_Key : Type := String
 
-constant PyCapsule_Get_Value : PyCapsule_Key → Type
+opaque PyCapsule_Get_Value : PyCapsule_Key → Type
 
 @[extern "Lean_PyCapsule_Make"]
-constant PyCapsule_Make : (k : PyCapsule_Key) → PyCapsule_Get_Value k → IOExp PyObject
+opaque PyCapsule_Make : (k : PyCapsule_Key) → PyCapsule_Get_Value k → IOExp PyObject
 
 @[extern "Lean_PyCapsule_Get"]
-constant PyCapsule_Get : (k : PyCapsule_Key) → PyObject → IOExp (PyCapsule_Get_Value k)
+opaque PyCapsule_Get : (k : PyCapsule_Key) → PyObject → IOExp (PyCapsule_Get_Value k)
 
 -- Py_None is done manually as it is used to define `Inhabited PyObject`
 
 @[extern "Lean_PyObject_Py_None"]
-private constant mkPyNone : Unit → PyObject := fun _ => Classical.choice PyObjectNonempty.property
+private opaque mkPyNone : Unit → PyObject := fun _ => Classical.choice PyObjectNonempty.property
 def Py_None : PyObject := mkPyNone ()
 
 instance : Inhabited PyObject where
   default := Py_None
 
 macro "mkpycheck!" name:ident : command => do
+  let u : Lean.TSyntax `str := Lean.quote s!"Lean_{name}"
   return Lean.mkNullNode #[
-    ← `(constant $name : PyObject → Bool),
-    ← `(attribute [extern $(Lean.quote s!"Lean_{name}")] $name)
+    ← `(opaque $name : PyObject → Bool),
+    -- ← `(attribute [extern $(Lean.quote s!"Lean_{name}")] $name)
+    ← `(attribute [extern $(Lean.TSyntax.mk u.raw)] $name)
   ]
 
 mkpycheck! PyBool_Check
@@ -116,8 +118,9 @@ mkpycheck! PyDict_Check
 
 macro "mkpyobj!" name:ident : command =>do
                                           let extern_ident := Lean.mkIdentFrom name (Lean.Name.mkSimple s!"{name.getId.toString}_")
-                                          let definition ← `(private constant $extern_ident (u : Unit): PyObject)
-                                          let attrdef ← `(attribute [extern $(Lean.quote s!"Lean_PyObject_{name}")] $extern_ident)
+                                          let definition ← `(private opaque $extern_ident (u : Unit): PyObject)
+                                          let strLit : Lean.TSyntax `str := Lean.quote s!"Lean_PyObject_{name}"
+                                          let attrdef ← `(attribute [extern $(Lean.TSyntax.mk strLit.raw)] $extern_ident)
                                           let defpub ← `(def $name : PyObject := $extern_ident ())
                                           return Lean.mkNullNode #[definition, attrdef, defpub]
                                          
