@@ -1,58 +1,83 @@
 import Lake
 open System Lake DSL
 
-def python := "python3.9"
+def pythonver := "3.10"
+def pythonverFull := "3.10.5"
+def python := s!"python{pythonver}"
+def releaseTarball := s!"Python-{pythonverFull}.tar.xz"
+def pythonReleaseUrl := s!"https://www.python.org/ftp/python/{pythonverFull}/{releaseTarball}"
 
-package leanpythonraw {
+package pythonraw {
   srcDir := "lean"
   libRoots := #[`Python.Raw]
-  defaultFacet := PackageFacet.sharedLib
-  moreLinkArgs := #[s!"-l{python}"]
+  defaultFacet := PackageFacet.leanLib
+  precompileModules := true
 }
 
-lean_lib LeanPythonRaw {
-
+lean_lib PythonRaw {
 }
-
-def includeDir := s!"/usr/include/{python}"
-
--- extern_lib cLib :=
 
 def pkgDir := __dir__
 def cDir := pkgDir / "c"
 def ffiSrc := cDir / "ffi.cpp"
-def buildDir := pkgDir / _package.buildDir / "c"
+def buildDir := pkgDir / _package.buildDir
+
+namespace Utils
+
+def wgetFile (url : String) (targ : FilePath) : FileTarget :=
+  fileTargetWithDep targ (Target.nil) (extraDepTrace := computeHash url) fun _ => do
+    createParentDirs targ
+    proc {
+      cmd := "wget"
+      args := #[url, "-O", targ.toString]
+    }
+
+end Utils
+
+-- tarball containing 
+def pythonTarball : FileTarget := Utils.wgetFile pythonReleaseUrl $ buildDir / releaseTarball
+
+-- a hack : we are settings the `configure` file as the target, in reality we want the whole directory
+def pythonSourceDir : FileTarget :=
+  let pythonSourceDir := buildDir / s!"Python-{pythonverFull}"
+  fileTargetWithDep  (pythonSourceDir / "configure") pythonTarball fun srcFile => do
+    proc {
+      cmd := "tar"
+      args := #["-xf", srcFile.toString, "-C", buildDir.toString]
+    }
+
+def pythonAFile : FileTarget :=
+  let pySourceDir := pythonSourceDir.info.parent.get!
+  let targetA := pySourceDir / s!"libpython{pythonver}.a"
+  fileTargetWithDep targetA pythonSourceDir fun srcFile => do
+    proc {
+      cmd := "./configure"
+      args := #["--enable-shared", "--enable-optimizations"]
+      cwd := srcFile.parent.get!
+    }
+
+    proc {
+      cmd := "make"
+      args := #["-C", srcFile.parent.get!.toString, s!"-j4", s!"libpython{pythonver}.a"]
+    }
+
+-- again, I don't know how to have a filetarget directory, so just cheat and say that a file in the directory is the target
+def pythonInclude : FileTarget :=
+  let pySourceDir := pythonSourceDir.info.parent.get!
+  fileTargetWithDep (pySourceDir / "Include" / "Python.h") pythonSourceDir fun _ => return
+
+extern_lib libPython := pythonAFile
 
 def ffiOTarget : FileTarget :=
-  let oFile := pkgDir / buildDir / cDir / "ffi.o"
+  let oFile := buildDir / cDir / "ffi.o"
   let srcTarget := inputFileTarget <| pkgDir / ffiSrc
-  fileTargetWithDep oFile srcTarget fun srcFile => do
-    compileO oFile srcFile #["-std=c++17", "-fno-threadsafe-statics", "-fno-exceptions", "-I", (← getLeanIncludeDir).toString, "-I", includeDir, "-fPIC"] "c++"
-
+  fileTargetWithDepList oFile [srcTarget, pythonInclude] fun srcFile => do
+    compileO oFile (srcFile.get! 0) #["-std=c++17", "-fno-threadsafe-statics", "-fno-exceptions",
+                                      "-I", (← getLeanIncludeDir).toString,
+                                      "-I", ((srcFile.get! 1).parent.get!.toString),
+                                      "-I", ((srcFile.get! 1).parent.get!.parent.get!.toString), -- needed for pyconfig.h
+                                      "-fPIC"] "c++"
 
 extern_lib cLib :=
-  let libFile := buildDir / "libpythonffi.so"
-  --staticLibTarget libFile #[ffiOTarget]
-  cSharedLibTarget libFile #[ffiOTarget]
-
--- 
--- def sharedLibDir (pkgDir : FilePath) : FilePath :=
---   pkgDir / buildDir / cDir / "libpythonffi.so"
--- 
--- def cLibTarget (pkgDir : FilePath) : FileTarget :=
---   let libFile := sharedLibDir pkgDir
---   leanSharedLibTarget libFile #[ffiOTarget pkgDir] #[s!"-l{python}"]
---   -- staticLibTarget libFile #[ffiOTarget pkgDir]
--- 
--- 
--- package leanpythonraw (pkgDir) {
---   -- add configuration options here
---   srcDir := "lean"
---   libRoots := #[`Python.Raw]
---   moreLibTargets := #[cLibTarget pkgDir]
---   moreServerArgs := #[]
---   defaultFacet := PackageFacet.sharedLib
---   supportInterpreter := true
---   -- moreLinkArgs := #[s!"-l{python}"]
--- }
--- 
+  let libFile := buildDir / nameToStaticLib "pythonffi"
+  staticLibTarget libFile #[ffiOTarget]
